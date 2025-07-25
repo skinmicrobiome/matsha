@@ -1,0 +1,21 @@
+name: matsha_env
+channels:
+  - defaults
+  - conda-forge
+  - bioconda
+dependencies:
+  - python
+  - numpy
+  - pandas
+  - samtools
+  - bowtie2
+  - snpeff
+  - scipy
+  - ncbi-genome-download
+  - biopython
+  - gatk4
+  - click
+  - pytest
+  - pip
+  - pip:
+      - -e .  # Install MATSHA in editable mode via pip

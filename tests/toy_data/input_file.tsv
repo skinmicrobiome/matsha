@@ -1,0 +1,21 @@
+R1	R2	Dummy phenotype
+./tests/toy_data/reads/Sample10_novaseq_R1.fastq	./tests/toy_data/reads/Sample10_novaseq_R2.fastq	0
+./tests/toy_data/reads/Sample11_novaseq_R1.fastq	./tests/toy_data/reads/Sample11_novaseq_R2.fastq	1
+./tests/toy_data/reads/Sample12_novaseq_R1.fastq	./tests/toy_data/reads/Sample12_novaseq_R2.fastq	0
+./tests/toy_data/reads/Sample13_novaseq_R1.fastq	./tests/toy_data/reads/Sample13_novaseq_R2.fastq	0
+./tests/toy_data/reads/Sample14_novaseq_R1.fastq	./tests/toy_data/reads/Sample14_novaseq_R2.fastq	0
+./tests/toy_data/reads/Sample15_novaseq_R1.fastq	./tests/toy_data/reads/Sample15_novaseq_R2.fastq	0
+./tests/toy_data/reads/Sample16_novaseq_R1.fastq	./tests/toy_data/reads/Sample16_novaseq_R2.fastq	1
+./tests/toy_data/reads/Sample17_novaseq_R1.fastq	./tests/toy_data/reads/Sample17_novaseq_R2.fastq	0
+./tests/toy_data/reads/Sample18_novaseq_R1.fastq	./tests/toy_data/reads/Sample18_novaseq_R2.fastq	0
+./tests/toy_data/reads/Sample19_novaseq_R1.fastq	./tests/toy_data/reads/Sample19_novaseq_R2.fastq	1
+./tests/toy_data/reads/Sample1_novaseq_R1.fastq	./tests/toy_data/reads/Sample1_novaseq_R2.fastq	1
+./tests/toy_data/reads/Sample20_novaseq_R1.fastq	./tests/toy_data/reads/Sample20_novaseq_R2.fastq	1
+./tests/toy_data/reads/Sample2_novaseq_R1.fastq	./tests/toy_data/reads/Sample2_novaseq_R2.fastq	1
+./tests/toy_data/reads/Sample3_novaseq_R1.fastq	./tests/toy_data/reads/Sample3_novaseq_R2.fastq	1
+./tests/toy_data/reads/Sample4_novaseq_R1.fastq	./tests/toy_data/reads/Sample4_novaseq_R2.fastq	0
+./tests/toy_data/reads/Sample5_novaseq_R1.fastq	./tests/toy_data/reads/Sample5_novaseq_R2.fastq	1
+./tests/toy_data/reads/Sample6_novaseq_R1.fastq	./tests/toy_data/reads/Sample6_novaseq_R2.fastq	0
+./tests/toy_data/reads/Sample7_novaseq_R1.fastq	./tests/toy_data/reads/Sample7_novaseq_R2.fastq	1
+./tests/toy_data/reads/Sample8_novaseq_R1.fastq	./tests/toy_data/reads/Sample8_novaseq_R2.fastq	1
+./tests/toy_data/reads/Sample9_novaseq_R1.fastq	./tests/toy_data/reads/Sample9_novaseq_R2.fastq	0
