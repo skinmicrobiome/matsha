@@ -18,16 +18,26 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
+    
+    - name: Install dependencies
+      run: |
+        conda install -n base -c conda-forge mamba
+        mamba env create -f environment.yml
+    
     - name: Set up Miniconda
       uses: conda-incubator/setup-miniconda@v3
       with:
         auto-update-conda: true
-        python-version: ${{ matrix.python-version }}
+        python-version: 3.12
         environment-file: environment.yml
         activate-environment: matsha_env
         use-mamba: true
 
+    - name: Debug conda info
+      run: |
+        conda info
+        conda list
+    
     - name: Install MATSHA in editable mode
       shell: bash -l {0}
       run: |
