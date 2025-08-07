@@ -3,7 +3,7 @@ import warnings
 from scipy import stats
 import numpy as np
 import os
-from collections import defaultdict
+from collections import Counter, defaultdict
 from matsha import utils
 
 
@@ -14,33 +14,32 @@ def gwas_correlation(genotype_dct, phenotype_dct, min_maf, min_sample_size):
         pheno_lst = []
         for sample in phenotype_dct:
             if sample in genotype_dct[v]:
-                if genotype_dct[v][sample] == -1:
+                if genotype_dct[v][sample] == -1 or str(phenotype_dct[sample])=='nan':
                     continue
                 else:
                     geno_lst.append(genotype_dct[v][sample])
                     pheno_lst.append(float(phenotype_dct[sample]))
         valid_counts = len(geno_lst)
-        try:
-            if min(Counter(np.array(geno_lst)>0).values()) >= valid_counts*min_maf and valid_counts >= min_sample_size:
+        if valid_counts >= min_sample_size:
+            if min(Counter(np.array(geno_lst)>0).values()) >= valid_counts*min_maf:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
                     S_corr, S_p = stats.spearmanr(geno_lst, pheno_lst)
-                stats_lst.append((v, 'correlation', S_corr, S_p))
-        except:
-            continue
+                if str(S_p) != 'nan':
+                    stats_lst.append((v, 'correlation', S_corr, S_p))
     
     return stats_lst
 
 
 def gwas_binary(genotype_dct, phenotype_dct, min_maf, min_sample_size):
     stats_lst = []
-    uniq_phenotype = set(phenotype_dct.values())
+    uniq_phenotype = set(v for v in phenotype_dct.values() if str(v)!='nan')
     for v in genotype_dct:
         contingency_dct = {p:{'g0':0, 'g1':0} for p in uniq_phenotype}
         geno_count_dct = {'g0':0, 'g1':0}
         for sample in phenotype_dct:
             if sample in genotype_dct[v]:
-                if genotype_dct[v][sample] == -1:
+                if genotype_dct[v][sample] == -1 or str(phenotype_dct[sample])=='nan':
                     continue
                 elif genotype_dct[v][sample] == 0:
                     contingency_dct[phenotype_dct[sample]]['g0'] += 1
@@ -49,25 +48,21 @@ def gwas_binary(genotype_dct, phenotype_dct, min_maf, min_sample_size):
                     contingency_dct[phenotype_dct[sample]]['g1'] += 1
                     geno_count_dct['g1'] += 1
         valid_counts = sum(geno_count_dct.values())
-        try:
-            if min(geno_count_dct.values()) >= valid_counts*min_maf and valid_counts >= min_sample_size:
-                contingency_tb = [list(i.values()) for i in contingency_dct.values()]
-                odds_ratio, p_value = stats.fisher_exact(contingency_tb, alternative='two-sided')
-                stats_lst.append((v, 'enrichment', odds_ratio, p_value))
-        except:
-            continue
+        if min(geno_count_dct.values()) >= valid_counts*min_maf and valid_counts >= min_sample_size:
+            contingency_tb = [list(i.values()) for i in contingency_dct.values()]
+            odds_ratio, p_value = stats.fisher_exact(contingency_tb, alternative='two-sided')
+            stats_lst.append((v, 'enrichment', odds_ratio, p_value))
+    
     return stats_lst
 
 
-def merge_variants_by_gene(genotype_by_variant, genes_lst):
+def merge_variants_by_gene(genotype_by_variant):
     genotype_by_gene = defaultdict(dict)
     for v, samples in genotype_by_variant.items():
-        contig, pos = v.split(':')
-        pos = int(pos) - 1
-        for g in genes_lst:
-            if g[0] == contig and g[1] < pos < g[2]:
-                for sample, val in samples.items():
-                    genotype_by_gene[g[3]][sample] = min(1, max(val, genotype_by_gene[g[3]].get(sample, 0)))
+        gene = v.split('|')[1]
+        if gene != "":
+            for sample, val in samples.items():
+                genotype_by_gene[gene][sample] = min(1, max(val, genotype_by_gene[gene].get(sample, 0)))
     return genotype_by_gene
 
 
@@ -79,39 +74,25 @@ def save_gwas_results(stats, output_file):
             wf.write('\t'.join(str(x) for x in l) + '\n')
 
 
-def run_GWAS(genotype_dct, phenotype_dct, genes_lst, mode, min_maf, min_sample_size, qcutoff, output_dir):
+def run_GWAS(genotype_dct, phenotype_dct, mode, min_maf, min_sample_size, qcutoff, output_dir):
     """GWAS test."""
+    os.makedirs(output_dir, exist_ok=True)
     for gwas_mode in ["gene", "variant"]:
         if mode not in [gwas_mode, "both"]:
             continue
 
-        # Prepare genotypes
+        # Merge variants by genes
         if gwas_mode == "gene":
-            if len(genes_lst) > 0:
-                genotypes = merge_variants_by_gene(genotype_dct, genes_lst)
-            else:
-                logging.info(f"No gene annotation found; skipping GWAS ({gwas_mode})...")
-                continue
+            genotypes = merge_variants_by_gene(genotype_dct)
         else:
-            genotypes = {}
-            # Attach gene info if available
-            for var in genotype_dct:
-                contig, pos = var.split(':')
-                pos = int(pos) - 1
-                for g in genes_lst:
-                    if g[0] == contig and g[1] < pos < g[2]:
-                        new_var = f"{var}|{g[3]}"
-                        break
-                else:
-                    new_var = f"{var}|"
-                genotypes[new_var] = genotype_dct[var]
-
+            genotypes = genotype_dct
+        
         # Run statistical tests
         logging.info(f"Running GWAS ({gwas_mode})...")
         all_stats_lst = []
         for ip in phenotype_dct:
             cur_phenotype_dct = phenotype_dct[ip]
-            uniq_phenotype = set(cur_phenotype_dct.values())
+            uniq_phenotype = set(v for v in cur_phenotype_dct.values() if str(v)!='nan')
             if len(uniq_phenotype) > 2: # quantitative variable
                 logging.info(f"Treating phenotype {ip} as quantitative variable.")
                 stats_lst = gwas_correlation(genotypes, cur_phenotype_dct, min_maf, min_sample_size)

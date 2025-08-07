@@ -47,24 +47,6 @@ def test_parse_input_paired(temp_dir):
     assert phenotype_dct["phenotype"]["sample2_R1.fastq"] == "0"
 
 
-def test_prepare_reference_custom(temp_dir, toy_data_dir):
-    genome = os.path.join(toy_data_dir, 'reference.fna')
-    gbff = os.path.join(toy_data_dir, 'reference.gbff')
-
-    ref_seq, gene_lst, bt2_index, snpeff_config = core.prepare_reference(
-        genome=genome,
-        genbank=gbff,
-        temp=temp_dir,
-        threads=1,
-        filter_flag=False
-    )
-
-    assert not snpeff_config
-    assert os.path.exists(ref_seq)
-    assert gene_lst[0][-1] == "EQW00_RS00005"
-    assert os.path.exists(bt2_index+'.1.bt2')
-
-
 def test_prepare_reference_no_gbff(temp_dir, toy_data_dir):
     genome = os.path.join(toy_data_dir, 'reference.fna')
 
@@ -73,7 +55,6 @@ def test_prepare_reference_no_gbff(temp_dir, toy_data_dir):
         genbank=None,
         temp=temp_dir,
         threads=1,
-        filter_flag=False
     )
 
     assert not snpeff_config
@@ -91,7 +72,6 @@ def test_prepare_reference_with_snpeff(temp_dir, toy_data_dir):
         genbank=gbff,
         temp=temp_dir,
         threads=1,
-        filter_flag=True
     )
     
     assert os.path.exists(snpeff_config)
@@ -118,7 +98,7 @@ def test_build_snpeff_and_annotate_variants(temp_dir, toy_data_dir):
     output_dir = os.path.join(temp_dir, "output")
     os.makedirs(output_dir, exist_ok=True)
 
-    new_vcf = core.annotate_variants(
+    new_vcf, annotation_flag = core.annotate_variants(
         vcf=vcf,
         output_dir=output_dir,
         snpeff_config=snpeff_config
@@ -126,6 +106,7 @@ def test_build_snpeff_and_annotate_variants(temp_dir, toy_data_dir):
 
     assert new_vcf == os.path.join(output_dir, "combined.g.annotated.vcf")
     assert os.path.exists(new_vcf)
+    assert annotation_flag == True
 
 
 # def test_prepare_reference_ncbi(temp_dir):
@@ -134,7 +115,6 @@ def test_build_snpeff_and_annotate_variants(temp_dir, toy_data_dir):
 #         genbank=None,
 #         temp=temp_dir,
 #         threads=1,
-#         filter_flag=False
 #     )
 
 #     assert os.path.exists(ref_seq)

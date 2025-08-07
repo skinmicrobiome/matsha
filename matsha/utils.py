@@ -17,7 +17,7 @@ def list_files_with_extension(folder, extension):
 
 
 def file_exists(path):
-    return os.path.exists(path)
+    return os.path.lexists(path)
 
 
 def fdr(p_vals):

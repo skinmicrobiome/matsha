@@ -16,10 +16,8 @@ from matsha import core, utils, version
               help="Force overwrite outputs")
 @click.option('-m', '--mode', type=click.Choice(['variant', 'gene', 'both']), default='both', show_default=True,
               help="GWAS testing mode")
-@click.option('--filter', 'filter_flag', is_flag=True, default=False, show_default=True,
-              help="Flag to indicate whether to filter variants by impact on protein coding")
-@click.option('--impact', 'filter_level', type=click.Choice(['1', '2', '3']), default='3', show_default=True,
-              help="Impact level to filter variants on if --filter is given; 3: high impact; 2: high and moderate impact; 1: high, moderate, and low impact")
+@click.option('--filter', 'filter_level', type=click.Choice(["-1", "0", "1", "2", "3"]), default="-1", show_default=True,
+              help="Impact level to filter variants on based on SnpEff annotations. 3: high impact; 2: moderate impact and above; 1: low impact and above; 0: modifier and above; -1: no filtering")
 @click.option('--paired', is_flag=True, default=False, show_default=True,
               help="Flag for paired-end reads")
 @click.option('--temp', default='./tmp/', show_default=True,
@@ -34,7 +32,7 @@ from matsha import core, utils, version
 @click.option('--min-sample-size', type=int, default=10, show_default=True,
               help="Minimum sample size cutoff")
 @click.option('-q', '--qcutoff', type=float, default=0.05, show_default=True,
-              help="Q-value cutoff for result filtering")
+              help="Q-value cutoff for calling significant hits")
 @click.option('-t', '--threads', type=int, default=4, show_default=True,
               help="Number of processors to use")
 @click.version_option(version.__version__, '-v', '--version', prog_name='matsha')

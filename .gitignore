@@ -70,3 +70,4 @@ tests/__pycache__/
 tmp/
 snpEff*
 tests/toy_data/output/logfile
+tests/toy_data/output/all/*.gz.tbi

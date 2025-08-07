@@ -8,7 +8,7 @@ import numpy as np
 import ncbi_genome_download as ngd
 from matsha import utils, gwas
 
-def prepare_reference(genome, genbank, temp, threads, filter_flag):
+def prepare_reference(genome, genbank, temp, threads):
     """Prepare reference genome, annotations, and indices."""
     ref_fna = os.path.join(temp, 'reference.fna')
     ref_gbff = os.path.join(temp, 'reference.gbff')
@@ -37,9 +37,7 @@ def prepare_reference(genome, genbank, temp, threads, filter_flag):
     # Load gene annotations only if file exists
     if utils.file_exists(ref_gbff):
         gene_lst = _load_gene_annotations(ref_gbff)
-
-        if filter_flag:
-            snpeff_config = _build_snpeff_db(temp, ref_fna, ref_gbff)
+        snpeff_config = _build_snpeff_db(temp, ref_fna, ref_gbff)
     else:
         logging.info("Skipping annotation-related steps (No gene annotation file found).")
 
@@ -66,7 +64,7 @@ def _build_snpeff_db(temp, seq_file, gbk_file):
         target_path = os.path.join(db_dir, target)
         if utils.file_exists(target_path):
             os.remove(target_path)
-        os.symlink(fname, target_path)
+        shutil.copy(fname, target_path)
 
     # Write configuration file
     config_path = os.path.join(temp, 'snpEff/snpEff.config')
@@ -252,7 +250,7 @@ def analyze_sequencing_depths(temp_dir, phenotype_dct, subsample_stats_file):
                         logging.info(f"Phenotype {pheno} shows imbalanced depths between groups: {group0} > {group1}")
                         subsample_pheno_lst.append(pheno)
                         for s, r in zip(group0_samples, r0):
-                            p = (np.argsort(np.argsort(r0)).tolist().index(list(r0).index(r)) + 1) / len(r0) * 100
+                            p = np.sum(r0 < r) / len(r0) * 100
                             r_new = np.percentile(r1, p)
                             sub_p = round(1 - ((r - r_new) / r), 4)
                             wf.write(f"{pheno}\t{s}\t{r}\t{p}\t{r_new}\t{sub_p}\n")
@@ -260,7 +258,7 @@ def analyze_sequencing_depths(temp_dir, phenotype_dct, subsample_stats_file):
                         logging.info(f"Phenotype {pheno} shows imbalanced depths between groups: {group1} > {group0}")
                         subsample_pheno_lst.append(pheno)
                         for s, r in zip(group1_samples, r1):
-                            p = (np.argsort(np.argsort(r1)).tolist().index(list(r1).index(r)) + 1) / len(r1) * 100
+                            p = np.sum(r1 < r) / len(r1) * 100
                             r_new = np.percentile(r0, p)
                             sub_p = round(1 - ((r - r_new) / r), 4)
                             wf.write(f"{pheno}\t{s}\t{r}\t{p}\t{r_new}\t{sub_p}\n")
@@ -359,17 +357,20 @@ def call_variants(bam_list, output_dir, ref_seq, ploidy, threads):
 
 def annotate_variants(vcf, output_dir, snpeff_config):
     annotated_vcf = os.path.join(output_dir, "combined.g.annotated.vcf")
-    if snpeff_config and utils.file_exists(vcf):
+    if utils.file_exists(annotated_vcf):
+        logging.info(f"Annotated VCF file already exists.")
+        return annotated_vcf, True
+    elif snpeff_config and utils.file_exists(vcf):
         logging.info(f"Start variant annotation.")
         utils.run_command(f"snpEff -config {snpeff_config} reference {vcf} > {annotated_vcf}")
         logging.info(f"Variant annotation completed.")
-        return annotated_vcf
+        return annotated_vcf, True
     else:
         logging.info(f"Skip variant annotation.")
-    return vcf
+        return vcf, False
 
 
-def read_vcf(vcf_file, depth_cutoff, filter_flag, filter_level):
+def read_vcf(vcf_file, depth_cutoff, annotation_flag, filter_level):
     """Load variants from VCF file and filter variants by protein-coding impacts."""
     genotype_dct = {}
     with open(vcf_file, 'r') as rf:
@@ -381,49 +382,60 @@ def read_vcf(vcf_file, depth_cutoff, filter_flag, filter_level):
             else:
                 # Process each variant
                 contig, pos, _, ref, alt = line.split('\t')[:5]
-                variant_id = ':'.join([contig,pos])
                 alt_lst = alt.split(',')
                 allele_lst = [ref]+alt_lst
                 genotypes = line.split('\t')[9:]
-
-                # Load variant's protein-coding impact
-                if filter_flag:
+                
+                # Determine variant impact if filtering is enabled
+                valid_genotype_lst = [0]
+                best_gene_id = ""
+                if annotation_flag:
                     level_dct = {l:i for i, l in enumerate(['MODIFIER', 'LOW', 'MODERATE', 'HIGH'])}
                     alt_dct = {al:i+1 for i, al in enumerate(alt_lst)}
                     ann_dct = {al:-1 for al in alt_lst}
-                    for ann in line.split('\t')[7].split(';ANN=')[1].split(','):
-                        try:
-                            cur_allele, cur_impact, cur_level = ann.split('|')[:3]
-                            ann_dct[cur_allele] = max(ann_dct[cur_allele], level_dct[cur_level])
-                        except:
-                            continue
-                    valid_genotype_lst = [0]
+                    gene_id_dct = {al: "" for al in allele_lst}
+                    ann_field = next((f for f in line.split('\t')[7].split(';') if f.startswith('ANN=')), None)
+                    if ann_field:
+                        for ann in ann_field[4:].split(','):
+                            cur_allele, cur_impact, cur_level, cur_gene_name, cur_gene_id = ann.split('|')[:5]
+                            if level_dct[cur_level] > ann_dct[cur_allele]:
+                                ann_dct[cur_allele] = level_dct[cur_level]
+                                gene_id_dct[cur_allele] = f"{cur_gene_id}|{cur_level}|{cur_impact}"
+                    
+                    max_level = -1
                     for k in ann_dct:
-                        if ann_dct[k] >= filter_level: # adjustable
+                        level = ann_dct[k]
+                        if level >= filter_level: # adjustable
                             valid_genotype_lst.append(alt_dct[k])
+                        if level > max_level:
+                            max_level = level
+                            best_gene_id = gene_id_dct[k]
+                    # Skip this variant if no allele meets the filter_level
+                    if max_level < filter_level:
+                        continue
 
                 # Filter variants by depth and protein-coding impact
+                variant_id = f"{contig}:{pos}|{best_gene_id}"
                 genotype_dct[variant_id] = {}
                 for k, g in enumerate(genotypes):
                     g_lst = []
-                    for i, d in enumerate(g.split(':')[1].split(',')):
-                        try:
-                            if filter_flag:
-                                if int(d) >= depth_cutoff and (i in valid_genotype_lst):
-                                    g_lst.append(i)
-                            else:
-                                if int(d) >= depth_cutoff:
-                                    g_lst.append(i)
-                        except:
+                    depth_vals = g.split(':')[1].split(',')
+                    for i, d in enumerate(depth_vals):
+                        if d == '.':
                             continue
+                        if int(d) >= depth_cutoff:
+                            if not annotation_flag or filter_level == -1 or (i in valid_genotype_lst):
+                                g_lst.append(i)
+                    
                     if len(g_lst) == 0:
                         genotype_dct[variant_id][samples[k]] = -1
                     else:
                         genotype_dct[variant_id][samples[k]] = sum(g_lst)
+    
     return genotype_dct
 
 
-def run_pipeline(input_file, genome, genbank, output, force, mode, filter_flag, filter_level,
+def run_pipeline(input_file, genome, genbank, output, force, mode, filter_level,
                  paired, temp, keep_temp, ploidy, min_depth, min_maf, min_sample_size, qcutoff, threads):
     logging.info(f"Pipeline started with {threads} threads")
     logging.info(f"Output will be stored at: {output}")
@@ -431,7 +443,7 @@ def run_pipeline(input_file, genome, genbank, output, force, mode, filter_flag, 
     logging.info(f"Temporary folder ready: {temp}")
     
     # 1. Reference preparation
-    ref_seq, genes_lst, bt2_index, snpeff_config = prepare_reference(genome, genbank, temp, threads, filter_flag)
+    ref_seq, genes_lst, bt2_index, snpeff_config = prepare_reference(genome, genbank, temp, threads)
     
     # 2. Input and phenotype loading
     R1_list, R2_list, phenotype_dct = parse_input(input_file, paired)
@@ -480,11 +492,12 @@ def run_pipeline(input_file, genome, genbank, output, force, mode, filter_flag, 
 
         # 7. Variant calling
         vcf = call_variants(bam_list_file, cur_output, ref_seq, ploidy, threads)
-        vcf = annotate_variants(vcf, cur_output, snpeff_config)
-        genotype_by_variant = read_vcf(vcf, min_depth, filter_flag, filter_level)
+        vcf, annotation_flag = annotate_variants(vcf, cur_output, snpeff_config)
+        filter_level = int(filter_level)
+        genotype_by_variant = read_vcf(vcf, min_depth, annotation_flag, filter_level)
 
         # 8. GWAS
-        gwas.run_GWAS(genotype_by_variant, phenotype_dct, genes_lst, mode, min_maf, min_sample_size, qcutoff, cur_output)
+        gwas.run_GWAS(genotype_by_variant, phenotype_dct, mode, min_maf, min_sample_size, qcutoff, cur_output)
 
     # Remove intermediate results
     if not keep_temp:

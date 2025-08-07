@@ -60,6 +60,37 @@ R1                              R2                              disease status  
 /path/to/sample4_R1.fastq.gz    /path/to/sample4_R2.fastq.gz    0            22.8
 ````
 
+## 📁 Outputs
+After running `matsha`, the following output structure is generated in the specified output directory:
+```text
+output_dir/
+├── logfile
+├── phenotype_subsampled.txt
+├── all/
+│ ├── combined.g.vcf
+│ ├── combined.g.annotated.vcf
+│ ├── gwas_output.gene.tsv
+│ ├── gwas_output.variant.tsv
+│ ├── gwas_output_significant.gene.tsv
+│ └── gwas_output_significant.variant.tsv
+├── 0/
+│ └── (same structure as all/)
+├── 1/
+└── ...
+```
+| Path | Description |
+|------|-------------|
+| `logfile` | A text file recording the runtime log of `matsha`, including command-line arguments, processing steps, and any warnings or errors. Useful for debugging or reproducibility. |
+| `phenotype_subsampled.txt` | A tab-delimited file listing the phenotypes for which subsampling was performed. Each listed phenotype corresponds to a numbered folder (e.g., `0/`, `1/`, ...). |
+| `all/` | Folder containing results from the full dataset without any subsampling. |
+| `0/`, `1/`, ... | Folders for each subsampled phenotype group listed in `phenotype_subsampled.txt`. Each folder contains results specific to that phenotype. |
+| `*/combined.g.vcf` | The unannotated merged VCF file containing variant calls across samples. |
+| `*/combined.g.annotated.vcf` | The same VCF file, annotated using SnpEff to include gene IDs and predicted impacts. |
+| `*/gwas_output.gene.tsv` | All GWAS results for gene-level analysis. |
+| `*/gwas_output.variant.tsv` | All GWAS results for variant-level analysis. |
+| `*/gwas_output_significant.gene.tsv` | Significantly associated genes based on statistical thresholds. |
+| `*/gwas_output_significant.variant.tsv` | Significantly associated variants based on statistical thresholds. |
+
 ## 🧪 Testing
 
 To run unit tests using the toy dataset:
